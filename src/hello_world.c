@@ -36,6 +36,7 @@ void print_and_free(void) {
     word_object *old_object;
 
     current_object = list_head;
+#if 0
     while (1) {
 	printf("%s\n", current_object->word);
 	free(current_object->word);
@@ -47,6 +48,17 @@ void print_and_free(void) {
 	    free(old_object);
 	    break;
 	}
+    }
+#endif
+
+    /* A more consise version of the above loop */
+    while (current_object) {
+	old_object = current_object;
+	current_object = current_object->next;
+
+	printf("%s\n", old_object->word);
+	free(old_object->word);
+	free(old_object);
     }
     
 }
