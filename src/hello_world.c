@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include <pthread.h>
 
 /* Linked list object */
 typedef struct s_word_object word_object;
@@ -9,58 +10,85 @@ struct s_word_object {
     char *word;
     word_object *next;
 };
+
+/* list_head: Shared between two threads, must be accessed with list_lock */
 static word_object *list_head;
+static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t list_data_ready = PTHREAD_COND_INITIALIZER;
+static pthread_cond_t list_data_flush = PTHREAD_COND_INITIALIZER;
 
 /* Add object to list */
 static void add_to_list(char *word) {
-    word_object *last_object;
+    word_object *last_object, *tmp_object;
+
+    char *tmp_string = strdup(word);
+    tmp_object = malloc(sizeof(word_object));
+
+    pthread_mutex_lock(&list_lock);
 
     if (list_head == NULL) {
-	last_object = malloc(sizeof(word_object));	
+	last_object = tmp_object;	
 	list_head = last_object;
     } else {
 	last_object = list_head;
 	while (last_object->next) {
 	    last_object = last_object->next;
 	}
-	last_object->next = malloc(sizeof(word_object));
+	last_object->next = tmp_object;
 	last_object = last_object->next;
     }
-    last_object->word = strdup(word);
+    last_object->word = tmp_string;
     last_object->next = NULL;
+
+    pthread_mutex_unlock(&list_lock);
+    pthread_cond_signal(&list_data_ready);
 }
 
-/* Print and free objects */
-void print_and_free(void) {
+static word_object *list_get_first(void) {
+    word_object *first_object;
+
+    first_object = list_head;
+    list_head = list_head->next;
+
+    return first_object;
+}
+
+static void *print_func(void *arg) {
     word_object *current_object;
-    word_object *old_object;
 
-    current_object = list_head;
-#if 0
-    while (1) {
-	printf("%s\n", current_object->word);
-	free(current_object->word);
-	old_object = current_object;
-	if (current_object->next) {
-	    current_object = current_object->next;
-	    free(old_object);
-	} else {
-	    free(old_object);
-	    break;
+    fprintf(stderr, "Print thread starting\n");
+
+    while(1) {
+	pthread_mutex_lock(&list_lock);
+
+	while (list_head == NULL) {
+	    pthread_cond_wait(&list_data_ready, &list_lock);
 	}
-    }
-#endif
 
-    /* A more consise version of the above loop */
-    while (current_object) {
-	old_object = current_object;
-	current_object = current_object->next;
+	current_object = list_get_first();
 
-	printf("%s\n", old_object->word);
-	free(old_object->word);
-	free(old_object);
+	pthread_mutex_unlock(&list_lock);
+
+	printf("Print thread: %s\n", current_object->word);
+	free(current_object->word);
+	free(current_object);
+
+	pthread_cond_signal(&list_data_flush);
     }
-    
+
+    /* Silence compiler warning */
+    return arg;
+}
+
+static void list_flush(void) {
+    pthread_mutex_lock(&list_lock);
+
+    while (list_head != NULL) {
+	pthread_cond_signal(&list_data_ready);
+	pthread_cond_wait(&list_data_flush, &list_lock);
+    }
+
+    pthread_mutex_unlock(&list_lock);
 }
 
 int main(int argc, char **argv) {
@@ -68,6 +96,7 @@ int main(int argc, char **argv) {
     int c;
     int option_index = 0;
     int count = -1;
+    pthread_t print_thread;
     static struct option long_options[] = {
 	{"count",   required_argument, 0, 'c'},
 	{0,         0,                 0,  0 }
@@ -85,6 +114,9 @@ int main(int argc, char **argv) {
 	}
     }
 
+    /* Start new thread for printing */
+    pthread_create(&print_thread, NULL, print_func, NULL);
+
     fprintf(stderr, "Accepting %i input strings\n", count);
 
     while (scanf("%256s", input_word) != EOF) {
@@ -92,8 +124,7 @@ int main(int argc, char **argv) {
 	if (!--count) break;
     }
 
-    /* print and free objects */
-    print_and_free();
+    list_flush();
 
     return 0;
 }
