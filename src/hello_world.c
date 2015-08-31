@@ -3,6 +3,13 @@
 #include <string.h>
 #include <getopt.h>
 #include <pthread.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
+#define SERVER_ADDR "127.0.0.1"
+#define SERVER_PORT 10000
+#define DATA_LENGTH 256
 
 /* Linked list object */
 typedef struct s_word_object word_object;
@@ -102,19 +109,108 @@ static void list_flush(void) {
     pthread_mutex_unlock(&list_lock);
 }
 
+static void start_server(void) {
+    int socket_fd;
+    struct sockaddr_in server_address;
+    struct sockaddr_in client_address;
+    socklen_t client_address_len;
+    int want_quit = 0;
+    fd_set read_fds;
+    int bytes;
+    char data[DATA_LENGTH];
+    pthread_t print_thread;
+
+    fprintf(stderr, "Starting server\n");
+
+    pthread_create(&print_thread, NULL, print_func, NULL);
+
+    socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+    memset(&server_address, 0, sizeof(server_address));
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = htons(SERVER_PORT);
+    server_address.sin_addr.s_addr = INADDR_ANY;
+
+
+    if (bind(socket_fd, (struct sockaddr *) &server_address, 
+			    sizeof(server_address)) < 0) {
+	fprintf(stderr, "Bind failed\n");
+	exit(1);
+    }
+    
+    FD_ZERO(&read_fds);
+    FD_SET(socket_fd, &read_fds);
+    while (!want_quit) {
+	
+	/* Wait until data has arrived */
+	if (select(socket_fd + 1, &read_fds, NULL, NULL, NULL) < 0) {
+	    fprintf(stderr, "Select failed\n");
+	    exit(1);
+	}
+
+	if (!FD_ISSET(socket_fd, &read_fds)) continue;
+
+	/* Read input data */
+	bytes = recvfrom(socket_fd, data, sizeof(data), 0,
+			(struct sockaddr *) &client_address, 
+			&client_address_len);
+
+	if (bytes < 0) {
+	    fprintf(stderr, "Recvfrom failed\n");
+	    exit(1);
+	}
+
+	/* Process data */
+	add_to_list(data);
+    }
+    
+    list_flush();
+}
+
+static void start_client(int count) {
+    int sock_fd;
+    struct sockaddr_in addr;
+    char input_word[DATA_LENGTH];
+
+    fprintf(stderr, "Accepting %i input strings\n", count);
+
+    if ((sock_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+	fprintf(stderr, "Socket failed\n");
+	exit(1);
+    }
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(SERVER_PORT);
+    addr.sin_addr.s_addr = inet_addr(SERVER_ADDR);
+
+    if (connect(sock_fd, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+	fprintf(stderr, "Connect failed\n");
+	exit(1);
+    }
+
+    while (scanf("%256s", input_word) != EOF) {
+	if (send(sock_fd, input_word, strlen(input_word) + 1, 0) < 0) {
+	    fprintf(stderr, "Send failed\n");
+	    exit(1);
+	}
+	if (!--count) break;
+    }
+}
+
 int main(int argc, char **argv) {
-    char input_word[256];
     int c;
     int option_index = 0;
     int count = -1;
-    pthread_t print_thread;
+    int server = 0;
     static struct option long_options[] = {
-	{"count",   required_argument, 0, 'c'},
-	{0,         0,                 0,  0 }
+	{"count",   required_argument,	0, 'c'},
+	{"server",  no_argument,	0, 's'},
+	{0,         0,			0,  0 }
     };
 
     while (1) {
-	c = getopt_long(argc, argv, "c:", long_options, &option_index);
+	c = getopt_long(argc, argv, "c:s", long_options, &option_index);
 	if (c == -1)
 	    break;
 
@@ -122,20 +218,14 @@ int main(int argc, char **argv) {
 	    case 'c':
 		count = atoi(optarg);
 		break;
+	    case 's':
+		server = 1;
+		break;
 	}
     }
 
-    /* Start new thread for printing */
-    pthread_create(&print_thread, NULL, print_func, NULL);
-
-    fprintf(stderr, "Accepting %i input strings\n", count);
-
-    while (scanf("%256s", input_word) != EOF) {
-	add_to_list(input_word);
-	if (!--count) break;
-    }
-
-    list_flush();
+    if (server) start_server();
+    else start_client(count);
 
     return 0;
 }
