@@ -1,0 +1,4 @@
+Name: Richard Kaye
+Program: part_1.c
+This program is the first part of the project for EES4100, Operating Systems and Network Programming.
+It reads three registers from a Modbus server and displays them on our client machine.
