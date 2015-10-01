@@ -11,6 +11,7 @@
 #define SERVER_PORT 10000
 #define DATA_LENGTH 256
 #define NUM_LISTS   2
+#define LISTEN_BACKLOG 1
 
 /* Linked list object */
 typedef struct s_word_object word_object;
@@ -112,7 +113,7 @@ static void list_flush(word_object *list_head) {
 }
 
 static void start_server(void) {
-    int socket_fd;
+    int socket_fd, session_sock_fd;
     struct sockaddr_in server_address;
     struct sockaddr_in client_address;
     socklen_t client_address_len;
@@ -124,9 +125,9 @@ static void start_server(void) {
 
     fprintf(stderr, "Starting server\n");
 
-    pthread_create(&print_thread, NULL, print_func, &list_heads[0]);
+    pthread_create(&print_thread, NULL, print_func, &list_heads[1]);
 
-    socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    socket_fd = socket(AF_INET, SOCK_STREAM, 0);
 
     memset(&server_address, 0, sizeof(server_address));
     server_address.sin_family = AF_INET;
@@ -139,34 +140,52 @@ static void start_server(void) {
 	fprintf(stderr, "Bind failed\n");
 	exit(1);
     }
-    
-    FD_ZERO(&read_fds);
-    FD_SET(socket_fd, &read_fds);
-    while (!want_quit) {
-	
-	/* Wait until data has arrived */
-	if (select(socket_fd + 1, &read_fds, NULL, NULL, NULL) < 0) {
-	    fprintf(stderr, "Select failed\n");
-	    exit(1);
-	}
 
-	if (!FD_ISSET(socket_fd, &read_fds)) continue;
-
-	/* Read input data */
-	bytes = recvfrom(socket_fd, data, sizeof(data), 0,
-			(struct sockaddr *) &client_address, 
-			&client_address_len);
-
-	if (bytes < 0) {
-	    fprintf(stderr, "Recvfrom failed\n");
-	    exit(1);
-	}
-
-	/* Process data */
-	add_to_list(&list_heads[0], data);
+    if (listen(socket_fd, LISTEN_BACKLOG) < 0) {
+	fprintf(stderr, "Listen failed\n");
+	exit(1);
     }
-    
-    list_flush(list_heads[0]);
+
+    while (!want_quit) {
+	client_address_len = sizeof(client_address);
+	if ((session_sock_fd = accept(socket_fd,
+					(struct sockaddr *) &client_address,
+					&client_address_len)) < 0 ) {
+	    fprintf(stderr, "Accept failed\n");
+	    exit(1);
+	}
+
+        FD_ZERO(&read_fds);
+        FD_SET(session_sock_fd, &read_fds);
+        while (!want_quit) {
+    	
+	    /* Wait until data has arrived */
+	    if (select(session_sock_fd + 1, &read_fds, NULL, NULL, NULL) < 0) {
+		fprintf(stderr, "Select failed\n");
+		exit(1);
+	    }
+	
+	    if (!FD_ISSET(session_sock_fd, &read_fds)) continue;
+	
+	    /* Read input data */
+	    bytes = recv(session_sock_fd, data, sizeof(data), 0);
+
+	    if (bytes == 0) {
+		fprintf(stderr, "Client disconnected\n");
+		break;
+	    }
+	
+	    if (bytes < 0) {
+		fprintf(stderr, "Recvfrom failed\n");
+		exit(1);
+	    }
+	
+	    /* Process data */
+	    add_to_list(&list_heads[1], data);
+        }
+    }
+
+    list_flush(list_heads[1]);
 }
 
 static void start_client(int count) {
@@ -176,7 +195,7 @@ static void start_client(int count) {
 
     fprintf(stderr, "Accepting %i input strings\n", count);
 
-    if ((sock_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    if ((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 	fprintf(stderr, "Socket failed\n");
 	exit(1);
     }
