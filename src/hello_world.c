@@ -6,12 +6,15 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <errno.h>
+#include <unistd.h>
 
 #define SERVER_ADDR "127.0.0.1"
 #define SERVER_PORT 10000
 #define DATA_LENGTH 256
 #define NUM_LISTS   2
 #define LISTEN_BACKLOG 1
+#define QUIT_STRING "exit"
 
 /* Linked list object */
 typedef struct s_word_object word_object;
@@ -137,7 +140,7 @@ static void start_server(void) {
 
     if (bind(socket_fd, (struct sockaddr *) &server_address, 
 			    sizeof(server_address)) < 0) {
-	fprintf(stderr, "Bind failed\n");
+	fprintf(stderr, "Bind failed: %s\n", strerror(errno));
 	exit(1);
     }
 
@@ -157,7 +160,7 @@ static void start_server(void) {
 
         FD_ZERO(&read_fds);
         FD_SET(session_sock_fd, &read_fds);
-        while (!want_quit) {
+        while (1) {
     	
 	    /* Wait until data has arrived */
 	    if (select(session_sock_fd + 1, &read_fds, NULL, NULL, NULL) < 0) {
@@ -181,10 +184,12 @@ static void start_server(void) {
 	    }
 	
 	    /* Process data */
-	    add_to_list(&list_heads[1], data);
+	    if (!strcmp(data, QUIT_STRING)) want_quit = 1;
+	    else add_to_list(&list_heads[1], data);
         }
     }
 
+    close(socket_fd);
     list_flush(list_heads[1]);
 }
 
