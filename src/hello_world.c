@@ -10,6 +10,7 @@
 #define SERVER_ADDR "127.0.0.1"
 #define SERVER_PORT 10000
 #define DATA_LENGTH 256
+#define NUM_LISTS   2
 
 /* Linked list object */
 typedef struct s_word_object word_object;
@@ -19,13 +20,13 @@ struct s_word_object {
 };
 
 /* list_head: Shared between two threads, must be accessed with list_lock */
-static word_object *list_head;
+static word_object *list_heads[NUM_LISTS];
 static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t list_data_ready = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t list_data_flush = PTHREAD_COND_INITIALIZER;
 
 /* Add object to list */
-static void add_to_list(char *word) {
+static void add_to_list(word_object **list_head, char *word) {
     word_object *last_object, *tmp_object;
     char *tmp_string;
     
@@ -40,12 +41,12 @@ static void add_to_list(char *word) {
 
     pthread_mutex_lock(&list_lock);
 
-    if (list_head == NULL) {
+    if (*list_head == NULL) {
 	/* The list is empty, just place our tmp_object at the head */
-	list_head = tmp_object;
+	*list_head = tmp_object;
     } else {
 	/* Iterate through the linked list to find the last object */
-	last_object = list_head;
+	last_object = *list_head;
 	while (last_object->next) {
 	    last_object = last_object->next;
 	}
@@ -59,16 +60,17 @@ static void add_to_list(char *word) {
 
 /* Retrieve the first object in the linked list. Note that this function must
  * be called with list_lock held */
-static word_object *list_get_first(void) {
+static word_object *list_get_first(word_object **list_head) {
     word_object *first_object;
 
-    first_object = list_head;
-    list_head = list_head->next;
+    first_object = *list_head;
+    *list_head = (*list_head)->next;
 
     return first_object;
 }
 
 static void *print_func(void *arg) {
+    word_object **list_head = (word_object **) arg;
     word_object *current_object;
 
     fprintf(stderr, "Print thread starting\n");
@@ -76,11 +78,11 @@ static void *print_func(void *arg) {
     while(1) {
 	pthread_mutex_lock(&list_lock);
 
-	while (list_head == NULL) {
+	while (*list_head == NULL) {
 	    pthread_cond_wait(&list_data_ready, &list_lock);
 	}
 
-	current_object = list_get_first();
+	current_object = list_get_first(list_head);
 
 	pthread_mutex_unlock(&list_lock);
 
@@ -98,7 +100,7 @@ static void *print_func(void *arg) {
     return arg;
 }
 
-static void list_flush(void) {
+static void list_flush(word_object *list_head) {
     pthread_mutex_lock(&list_lock);
 
     while (list_head != NULL) {
@@ -122,7 +124,7 @@ static void start_server(void) {
 
     fprintf(stderr, "Starting server\n");
 
-    pthread_create(&print_thread, NULL, print_func, NULL);
+    pthread_create(&print_thread, NULL, print_func, &list_heads[0]);
 
     socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
 
@@ -161,10 +163,10 @@ static void start_server(void) {
 	}
 
 	/* Process data */
-	add_to_list(data);
+	add_to_list(&list_heads[0], data);
     }
     
-    list_flush();
+    list_flush(list_heads[0]);
 }
 
 static void start_client(int count) {
