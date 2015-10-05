@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <netinet/in.h>
 
-
+// file name changed to modbus_client.c
 //Define names for the arguments in the modbus_new_tcp() function
 #define SERVER_ADDRESS "140.159.153.159"
 #define SERVER_PORT 502
