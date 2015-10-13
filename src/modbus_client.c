@@ -8,7 +8,9 @@
 
 // file name changed to modbus_client.c
 //Define names for the arguments in the modbus_new_tcp() function
-#define SERVER_ADDRESS "140.159.153.159"
+//#define SERVER_ADDRESS "140.159.153.159"
+#define SERVER_ADDRESS "127.0.0.1"
+// Changed to the Loopback address for testing
 #define SERVER_PORT 502
 
 //Variables used for reading the registers
@@ -39,7 +41,8 @@ int main(void){
 }
 
 //Read the registers
-	rc = modbus_read_registers(ctx, 12, 3, tab_reg);
+	rc = modbus_read_registers(ctx, 52, 2, tab_reg);// I have been assigned Modbus address 52 and 53
+							// so this line now allows me to read those address
 	if (rc == -1){
 		fprintf(stderr, "Reading of the registers has failed:%s\n", modbus_strerror(errno));
 	                                                    //Detects that an error has occured
