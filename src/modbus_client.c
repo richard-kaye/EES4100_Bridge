@@ -49,8 +49,8 @@
 //Variables used for reading the registers
 
 uint16_t tab_reg[64];//Memory for storing the registers
-int rc;              //An integer to store the number of registers read from the server
-int i;               //An integer to keep count of the registers printed to the screen
+static uint16_t test_data[] = {
+	0xA4EC, 0x6E39, 0x8740, 0x1065, 0x9134, 0xFC8C};
 
 
 #define NUM_TEST_DATA (sizeof(test_data)/sizeof(test_data[0]))
@@ -192,9 +192,12 @@ static void *second_tick(void *arg) {
 
 /////////////////////////////////top of modbus///////////////////////////////////////
 
-static void *modbus_client(void *arg){
+static int modbus_start(void){
 //Allocate and initialise a new modbus_t structure
-	modbus_t *ctx;	
+	int rc;
+	int i;
+	modbus_t *ctx;
+	
 	ctx = modbus_new_tcp(SERVER_ADDRESS,SERVER_PORT);//Arguments to function
 	if (ctx == NULL) {  //This NULL is returned on error
 		fprintf(stderr, " Allocation and Initialisation unsucseful\n");//Display message on 								 //screen to indicate failure
@@ -277,7 +280,8 @@ int main(int argc, char **argv) {
 
     pthread_create(&minute_tick_id, 0, minute_tick, NULL);
     pthread_create(&second_tick_id, 0, second_tick, NULL);
-    pthread_create(&modbus_client_id, 0, modbus_client, NULL);
+    //pthread_create(&modbus_client_id, 0, modbus_start, NULL);
+    modbus_start();
     /* Start another thread here to retrieve your allocated registers from the
      * modbus server. This thread should have the following structure (in a
      * separate function):
