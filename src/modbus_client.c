@@ -58,7 +58,15 @@ typedef struct s_list_object list_object;
 struct s_list_object{
 	int number;
 	list_object *next
-	};
+};
+
+//List is shared between Modbus and BACnet so need list lock//
+static list_object *list_head;
+static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t list_data_ready = PTHREAD_COND_INITIALIZER;
+static pthread_cond_t list_data_flush = PTHREAD_COND_INITIALIZER;
+
+
 
 
 #define NUM_TEST_DATA (sizeof(test_data)/sizeof(test_data[0]))
