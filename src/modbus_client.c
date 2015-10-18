@@ -202,8 +202,8 @@ static void *second_tick(void *arg)
 
 /////////////////////////////////top of modbus///////////////////////////////////////
 
-static int modbus_start(void)
-{
+static void *modbus_start(void *arg){
+
     
 //Allocate and initialise a new modbus_t structure
     int rc;
@@ -248,7 +248,7 @@ static int modbus_start(void)
     modbus_close(ctx);
     modbus_free(ctx);
     sleep(0.1);//100ms sleep
-    return 0;
+    return arg;
 
 }
 
@@ -277,7 +277,7 @@ int main(int argc, char **argv)
     uint16_t pdu_len;
     BACNET_ADDRESS src;
     pthread_t minute_tick_id, second_tick_id;
-
+    pthread_t modbus_start_id;
     bacnet_Device_Set_Object_Instance_Number(BACNET_DEVICE_NO);
     bacnet_address_init();
 
@@ -299,8 +299,9 @@ int main(int argc, char **argv)
 
     pthread_create(&minute_tick_id, 0, minute_tick, NULL);
     pthread_create(&second_tick_id, 0, second_tick, NULL);
-    //pthread_create(&modbus_client_id, 0, modbus_start, NULL);
-    modbus_start();
+    pthread_create(&modbus_start_id, 0, modbus_start, NULL);
+    
+    //modbus_start();
     /* Start another thread here to retrieve your allocated registers from the
      * modbus server. This thread should have the following structure (in a
      * separate function):
