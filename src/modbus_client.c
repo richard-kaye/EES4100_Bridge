@@ -53,6 +53,12 @@ uint16_t tab_reg[64];		//Memory for storing the registers
 static uint16_t test_data[] = {
     0xA4EC, 0x6E39, 0x8740, 0x1065, 0x9134, 0xFC8C
 };
+//Linked List Object//
+typedef struct s_list_object list_object;
+struct s_list_object{
+	int number;
+	list_object *next
+	};
 
 
 #define NUM_TEST_DATA (sizeof(test_data)/sizeof(test_data[0]))
