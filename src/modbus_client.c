@@ -204,6 +204,7 @@ static void *second_tick(void *arg)
 
 static int modbus_start(void)
 {
+    
 //Allocate and initialise a new modbus_t structure
     int rc;
     int i;
@@ -212,6 +213,7 @@ static int modbus_start(void)
     ctx = modbus_new_tcp(SERVER_ADDRESS, SERVER_PORT);	//Arguments to function
     if (ctx == NULL) {		//This NULL is returned on error
 	fprintf(stderr, " Allocation and Initialisation unsucseful\n");	//Display message on                                                              //screen to indicate failure
+	sleep(1);//1 second sleep
 	return -1;
     }
 //Establish a connection using the modbus_t structure       
@@ -220,6 +222,7 @@ static int modbus_start(void)
 		modbus_strerror(errno));
 	//Detect return value from function to confirm connection
 	modbus_free(ctx);	//This function shall free an allocated modbus_t structure.
+	sleep(1);//1 second sleep
 	return -1;
     } else {
 	fprintf(stderr, "Connection to server succesful\n");	//If the return value from
@@ -244,6 +247,7 @@ static int modbus_start(void)
 //Close the connection to the server and free the modbus_t structure
     modbus_close(ctx);
     modbus_free(ctx);
+    sleep(0.1);//100ms sleep
     return 0;
 
 }
