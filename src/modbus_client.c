@@ -1,7 +1,5 @@
-//Added bacnet_server.c to modbus_client.c
-//ran indent over code
-#include <stdio.h>
 
+#include <stdio.h>
 #include <libbacnet/address.h>
 #include <libbacnet/device.h>
 #include <libbacnet/handlers.h>
@@ -12,22 +10,17 @@
 #include <libbacnet/tsm.h>
 #include <libbacnet/ai.h>
 #include "bacnet_namespace.h"
-
-// libraries from modbus_client
 #include <modbus-tcp.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
 
-// file name changed to modbus_client.c
-//Define names for the arguments in the modbus_new_tcp() function
-//#define SERVER_ADDRESS "140.159.153.159"
+/*Define names for the arguments in the modbus_new_tcp() function*/
+#define SERVER_ADDRESS "140.159.153.159"
 #define SERVER_ADDRESS "127.0.0.1"
-// Changed to the Loopback address for testing
+/*Changed to the Loopback address for testing*/
 #define SERVER_PORT 502
-
-
 #define BACNET_DEVICE_NO            52
 #define BACNET_PORT                 0xBAC1
 #define BACNET_INTERFACE            "lo"
@@ -49,33 +42,28 @@
  * for your final submitted application. */
 //Variables used for reading the registers
 
-uint16_t tab_reg[64];		//Memory for storing the registers
+uint16_t tab_reg[64];		/*Memory for storing the registers*/
 static uint16_t test_data[] = {
     0xA4EC, 0x6E39, 0x8740, 0x1065, 0x9134, 0xFC8C
 };
-//Linked List Object//
+/*Linked List Object*/
 typedef struct s_list_object list_object;
 struct s_list_object{
 	int number;
 	list_object *next;
 };
 
-//List is shared between Modbus and BACnet so need list lock//
+/*List is shared between Modbus and BACnet so need list lock*/
 static list_object *list_head;
 static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t list_data_ready = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t list_data_flush = PTHREAD_COND_INITIALIZER;
 
-
-
-
 #define NUM_TEST_DATA (sizeof(test_data)/sizeof(test_data[0]))
 
 static pthread_mutex_t timer_lock = PTHREAD_MUTEX_INITIALIZER;
-
 static int Update_Analog_Input_Read_Property(BACNET_READ_PROPERTY_DATA *
-					     rpdata)
-{
+					     rpdata){
 
     static int index;
     int instance_no =
@@ -212,66 +200,54 @@ static void *second_tick(void *arg)
     return arg;
 }
 
-
-
-/////////////////////////////////top of modbus///////////////////////////////////////
-
-static void *modbus_start(void *arg){
-
-    
-//Allocate and initialise a new modbus_t structure
+/*Modbus*/
+static void *modbus_start(void *arg){ /*Allocate and initialise a new modbus_t*/
+							/*structure*/
     int rc;
     int i;
     modbus_t *ctx;
     restart:
-
-    ctx = modbus_new_tcp(SERVER_ADDRESS, SERVER_PORT);	//Arguments to function
-    if (ctx == NULL) {		//This NULL is returned on error
-	fprintf(stderr, " Allocation and Initialisation unsucseful\n");	//Display message on                                                              //screen to indicate failure
-	sleep(1);//1 second sleep
+    ctx = modbus_new_tcp(SERVER_ADDRESS, SERVER_PORT);/*Arguments to function*/
+    if (ctx == NULL) {	
+	fprintf(stderr, " Allocation and Initialisation unsucseful\n");                       
+	sleep(1);
 	return -1;
 	goto restart;
-    }
-//Establish a connection using the modbus_t structure       
+}
+/*Establish a connection using the modbus_t structure*/       
     if (modbus_connect(ctx) == -1) {
 	fprintf(stderr, "Connenction to server unsuccesful:%s\n",
 		modbus_strerror(errno));
-	//Detect return value from function to confirm connection
-	modbus_free(ctx);	//This function shall free an allocated modbus_t structure.
-	sleep(1);//1 second sleep
+	/*Detect return value from function to confirm connection*/
+	modbus_free(ctx);/*This function shall free an allocated modbus_t structure*/
+	sleep(1);
 	return -1;
 	goto restart;
-    } else {
-	fprintf(stderr, "Connection to server succesful\n");	//If the return value from
-	//the function is not -1
-	//connection was succesful
-    }
+}
+    else {
+	fprintf(stderr, "Connection to server succesful\n");
+}
 
-//Read the registers
-    rc = modbus_read_registers(ctx, 52, 2, tab_reg);	// I have been assigned Modbus address 52 and 53
-    // so this line now allows me to read those address
+/*Read the registers*/
+    rc = modbus_read_registers(ctx, 52, 2, tab_reg);/* I have been assigned Modbus address*/
+                                                                 /*52 and 53*/
     if (rc == -1) {
 	fprintf(stderr, "Reading of the registers has failed:%s\n",
-		modbus_strerror(errno));
-	//Detects that an error has occured
+		                 modbus_strerror(errno));
 	return -1;
 	goto restart;
-
-    }
-
+}
     for (i = 0; i < rc; i++) {
 	printf("reg[%d]=%d (0x%X)\n", i, tab_reg[i], tab_reg[i]);
-	//Display the contents of registers up to the rc value, the number of registers read
-    }
-//Close the connection to the server and free the modbus_t structure
+    /*Display the contents of registers up to the rc value, the number of registers read*/
+}
+/*Close the connection to the server and free the modbus_t structure*/
     modbus_close(ctx);
     modbus_free(ctx);
     sleep(0.1);//100ms sleep
     return arg;
+} /* End of Modbus*/
 
-}
-
-///////////////////////////////bottom of modbus///////////////////////
 
 
 static void ms_tick(void)
@@ -318,7 +294,7 @@ int main(int argc, char **argv)
 
     pthread_create(&minute_tick_id, 0, minute_tick, NULL);
     pthread_create(&second_tick_id, 0, second_tick, NULL);
-    pthread_create(&modbus_start_id, 0, modbus_start, NULL);
+    pthread_create(&modbus_start_id, 0, modbus_start, NULL);/*Modbus*/
     
     //modbus_start();
     /* Start another thread here to retrieve your allocated registers from the
