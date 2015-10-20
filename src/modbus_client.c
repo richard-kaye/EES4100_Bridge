@@ -57,7 +57,7 @@ static uint16_t test_data[] = {
 typedef struct s_list_object list_object;
 struct s_list_object{
 	int number;
-	list_object *next
+	list_object *next;
 };
 
 //List is shared between Modbus and BACnet so need list lock//
@@ -223,12 +223,14 @@ static void *modbus_start(void *arg){
     int rc;
     int i;
     modbus_t *ctx;
+    restart:
 
     ctx = modbus_new_tcp(SERVER_ADDRESS, SERVER_PORT);	//Arguments to function
     if (ctx == NULL) {		//This NULL is returned on error
 	fprintf(stderr, " Allocation and Initialisation unsucseful\n");	//Display message on                                                              //screen to indicate failure
 	sleep(1);//1 second sleep
 	return -1;
+	goto restart;
     }
 //Establish a connection using the modbus_t structure       
     if (modbus_connect(ctx) == -1) {
@@ -238,6 +240,7 @@ static void *modbus_start(void *arg){
 	modbus_free(ctx);	//This function shall free an allocated modbus_t structure.
 	sleep(1);//1 second sleep
 	return -1;
+	goto restart;
     } else {
 	fprintf(stderr, "Connection to server succesful\n");	//If the return value from
 	//the function is not -1
@@ -252,6 +255,8 @@ static void *modbus_start(void *arg){
 		modbus_strerror(errno));
 	//Detects that an error has occured
 	return -1;
+	goto restart;
+
     }
 
     for (i = 0; i < rc; i++) {
