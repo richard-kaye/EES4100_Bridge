@@ -202,23 +202,30 @@ static void *second_tick(void *arg)
 
 /*Add to list*/
 static void add_to_list(list_object **list_head, int number){
-list_object *last_object, *temp_object;
-int temp_number;
-temp_number = malloc(sizeof(list_object));
-temp_object -> number = temp_number;
-temp_object -> next = NULL;
+	list_object *last_object, *temp_object;/**/
+	int temp_number;
+	temp_number = malloc(sizeof(list_object));/*Allocate memory for each number*/
 
-if (*list_head == NULL){
-	*list_head = temp_object;
+	pthread_mutex_lock(&list_lock);
+
+	temp_object -> number = temp_number;
+	temp_object -> next = NULL;
+
+		if (*list_head == NULL){/*make the first number in list*/
+	*list_head = temp_object;/*point to the first number*/
 }
-else{
-last_object = *list_head;
-while(last_object -> next){
-	last_object -> next;
+		else{
+	last_object = *list_head;
+	while(last_object -> next){
+		last_object -> next;
 }
-last_object -> next = temp_object;
+	last_object -> next = temp_object;
+	last_object = last_object -> next;
+	}
+	pthread_mutex_unlock(&list_lock);
+	pthread_cond_signal(&list_data_ready);
 }
-}
+
 
 
 
