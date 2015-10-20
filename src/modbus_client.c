@@ -200,6 +200,28 @@ static void *second_tick(void *arg)
     return arg;
 }
 
+/*Add to list*/
+static void add_to_list(list_object **list_head, int number){
+list_object *last_object, *temp_object;
+int temp_number;
+temp_number = malloc(sizeof(list_object));
+temp_object -> number = temp_number;
+temp_object -> next = NULL;
+
+if (*list_head == NULL){
+	*list_head = temp_object;
+}
+else{
+last_object = *list_head;
+while(last_object -> next){
+	last_object -> next;
+}
+last_object -> next = temp_object;
+}
+}
+
+
+
 /*Modbus*/
 static void *modbus_start(void *arg){ /*Allocate and initialise a new modbus_t*/
 							/*structure*/
@@ -213,7 +235,7 @@ static void *modbus_start(void *arg){ /*Allocate and initialise a new modbus_t*/
 	sleep(1);
 	return -1;
 	goto restart;
-}
+    }
 /*Establish a connection using the modbus_t structure*/       
     if (modbus_connect(ctx) == -1) {
 	fprintf(stderr, "Connenction to server unsuccesful:%s\n",
@@ -223,10 +245,10 @@ static void *modbus_start(void *arg){ /*Allocate and initialise a new modbus_t*/
 	sleep(1);
 	return -1;
 	goto restart;
-}
+    }    
     else {
 	fprintf(stderr, "Connection to server succesful\n");
-}
+    } 
 
 /*Read the registers*/
     rc = modbus_read_registers(ctx, 52, 2, tab_reg);/* I have been assigned Modbus address*/
@@ -236,11 +258,11 @@ static void *modbus_start(void *arg){ /*Allocate and initialise a new modbus_t*/
 		                 modbus_strerror(errno));
 	return -1;
 	goto restart;
-}
+    }
     for (i = 0; i < rc; i++) {
 	printf("reg[%d]=%d (0x%X)\n", i, tab_reg[i], tab_reg[i]);
     /*Display the contents of registers up to the rc value, the number of registers read*/
-}
+    }
 /*Close the connection to the server and free the modbus_t structure*/
     modbus_close(ctx);
     modbus_free(ctx);
