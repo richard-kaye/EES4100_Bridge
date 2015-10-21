@@ -200,16 +200,26 @@ static void *second_tick(void *arg)
     return arg;
 }
 
+/* What I need to do
+ * Create add to list (done)
+ * Find the last object in the list
+ * Place the next object in the list after the last object
+ * Retrieve the first object from list
+ * Print this object
+ * Free object and memory
+ * Flush the list
+ * Set up Modbus connection */
+
 /*Add to list*/
 static void add_to_list(list_object **list_head, int number){
 	list_object *last_object, *temp_object;/**/
 	int temp_number;
 	temp_number = malloc(sizeof(list_object));/*Allocate memory for each number*/
 
-	pthread_mutex_lock(&list_lock);
-
 	temp_object -> number = temp_number;
 	temp_object -> next = NULL;
+
+	pthread_mutex_lock(&list_lock);
 
 		if (*list_head == NULL){/*make the first number in list*/
 	*list_head = temp_object;/*point to the first number*/
@@ -220,13 +230,16 @@ static void add_to_list(list_object **list_head, int number){
 		last_object -> next;
 }
 	last_object -> next = temp_object;
-	last_object = last_object -> next;
 	}
 	pthread_mutex_unlock(&list_lock);
 	pthread_cond_signal(&list_data_ready);
 }
 
-
+static list_object *list_get_first(void){
+list_object *first_object;
+first_object = list_head;
+list_head = list_head -> next;
+}
 
 
 /*Modbus*/
