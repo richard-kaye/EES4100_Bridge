@@ -17,10 +17,9 @@
 #include <netinet/in.h>
 
 /*Define names for the arguments in the modbus_new_tcp() function*/
-#define SERVER_ADDRESS "140.159.153.159"
 #define SERVER_ADDRESS "127.0.0.1"
 /*Changed to the Loopback address for testing*/
-#define SERVER_PORT 502
+#define SERVER_PORT                 502
 #define BACNET_DEVICE_NO            52
 #define BACNET_PORT                 0xBAC1
 #define BACNET_INTERFACE            "lo"
@@ -40,15 +39,13 @@
  * BACnet client will print "Successful match" whenever it is able to receive
  * this set of data. Note that you will not have access to the RANDOM_DATA_POOL
  * for your final submitted application. */
-//Variables used for reading the registers
 
-uint16_t tab_reg[64];		/*Memory for storing the registers*/
 static uint16_t test_data[] = {
     0xA4EC, 0x6E39, 0x8740, 0x1065, 0x9134, 0xFC8C
 };
 /*Linked List Object*/
 typedef struct s_list_object list_object;
-struct s_list_object{
+	struct s_list_object{
 	int number;
 	list_object *next;
 };
@@ -65,8 +62,8 @@ static pthread_mutex_t timer_lock = PTHREAD_MUTEX_INITIALIZER;
 static int Update_Analog_Input_Read_Property(BACNET_READ_PROPERTY_DATA *
 					     rpdata){
 
-    static int index;
-    int instance_no =
+static int index;
+int instance_no =
 	bacnet_Analog_Input_Instance_To_Index(rpdata->object_instance);
 
     if (rpdata->object_property != bacnet_PROP_PRESENT_VALUE)
@@ -208,9 +205,11 @@ static void *second_tick(void *arg)
  * Print this object
  * Free object and memory
  * Flush the list
- * Set up Modbus connection */
+ * Set up Modbus connection
+ * Make Modbus a function
+ * Make new thread for printing
 
-/*Add to list*/
+    *Add to list*/
 static void add_to_list(list_object **list_head, int number){
 	list_object *last_object, *temp_object;/**/
 	int temp_number;
@@ -252,7 +251,7 @@ static void *print_func(void *arg){
 		}
 	current_object = list_get_first;
 	pthread_mutex_unlock(&list_lock);
-	printf("Print thread: %s\n", current_object -> number);
+	printf("Print thread: %d\n", current_object -> number);
 	free(current_object -> number);
 	free(current_object);
 
@@ -270,11 +269,9 @@ static list_flush(void){
 }
 
 
-
-
 /*Modbus*/
-static modbus_start(void){ /*Allocate and initialise a new modbus_t*/
-							/*structure*/
+static modbus_start(void){ /*Allocate and initialise a new modbus_t
+							  structure*/
 	uint16_t tab_reg[64];
     	int rc;
     	int i;
@@ -311,11 +308,11 @@ static modbus_start(void){ /*Allocate and initialise a new modbus_t*/
 		return -1;
 		goto restart;
     	}
-    	for (i = 0; i < rc; i++) {
+    //	for (i = 0; i < rc; i++) {
 /*Display the contents of registers up to the rc value, the number of registers read*/
-	printf("reg[%d]=%d (0x%X)\n", i, tab_reg[i], tab_reg[i]);
+	//printf("reg[%d]=%d (0x%X)\n", i, tab_reg[i], tab_reg[i]);
     
-    	}
+    //	}
 /*Close the connection to the server and free the modbus_t structure*/
     	modbus_close(ctx);
     	modbus_free(ctx);
