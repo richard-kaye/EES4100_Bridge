@@ -260,6 +260,14 @@ static void *print_func(void *arg){
 	}
 	return arg;
 }
+static list_flush(void){
+	pthread_mutex_lock(&list_lock);
+	while(list_head != NULL){
+		pthread_cond_signal(&list_data_ready);
+		pthread_cond_wait(&list_data_flush, &list_lock);
+	}
+	pthread_mutex_unlock(&list_lock);
+}
 
 
 
