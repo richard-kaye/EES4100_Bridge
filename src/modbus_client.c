@@ -236,10 +236,32 @@ static void add_to_list(list_object **list_head, int number){
 }
 
 static list_object *list_get_first(void){
-list_object *first_object;
-first_object = list_head;
-list_head = list_head -> next;
+	list_object *first_object;
+	first_object = list_head;
+	list_head = list_head -> next;
+	return first_object;
 }
+
+static void *print_func(void *arg){
+	list_object  *current_object;
+	fprintf(stderr, "Print thread starting\n");
+	while(1){
+		pthread_mutex_lock(&list_lock);
+		while(list_head == NULL){
+			pthread_cond_wait(&list_data_ready, &list_lock);
+		}
+	current_object = list_get_first;
+	pthread_mutex_unlock(&list_lock);
+	printf("Print thread: %s\n", current_object -> number);
+	free(current_object -> number);
+	free(current_object);
+
+	pthread_cond_signal(&list_data_flush);
+	}
+	return arg;
+}
+
+
 
 
 /*Modbus*/
