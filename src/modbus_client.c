@@ -46,12 +46,12 @@ static uint16_t test_data[] = {
 /*Linked List Object*/
 typedef struct s_list_object list_object;
 	struct s_list_object{
-	int number;
+	uint16_t number;
 	list_object *next;
 };
 
 /*List is shared between Modbus and BACnet so need list lock*/
-static list_object *list_head;
+static list_object *list_head[NUM_LISTS];
 static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t list_data_ready = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t list_data_flush = PTHREAD_COND_INITIALIZER;
@@ -210,34 +210,34 @@ static void *second_tick(void *arg)
  * Make new thread for printing
 
     *Add to list*/
-static void add_to_list(list_object **list_head, int number){
+static void add_to_list(list_object **list_head, uint16_t number){
 	list_object *last_object, *temp_object;/**/
-	int temp_number;
-	temp_number = malloc(sizeof(list_object));/*Allocate memory for each number*/
+	
+	temp_object = malloc(sizeof(list_object));/*Allocate memory for each number*/
 
-	temp_object -> number = temp_number;
+	temp_object -> number = number;
 	temp_object -> next = NULL;
 
 	pthread_mutex_lock(&list_lock);
 
-		if (*list_head == NULL){/*make the first number in list*/
-	*list_head = temp_object;/*point to the first number*/
+	if (*list_head == NULL){/*make the first number in list*/
+		*list_head = temp_object;/*point to the first number*/
 }
-		else{
+	else{
 	last_object = *list_head;
 	while(last_object -> next){
-		last_object -> next;
-}
+		last_object = last_object -> next;
+	}
 	last_object -> next = temp_object;
 	}
 	pthread_mutex_unlock(&list_lock);
 	pthread_cond_signal(&list_data_ready);
 }
 
-static list_object *list_get_first(void){
+static list_object *list_get_first(list_object **list_head){
 	list_object *first_object;
-	first_object = list_head;
-	list_head = list_head -> next;
+	first_object = *list_head;
+	*list_head = (*list_head) -> next;
 	return first_object;
 }
 

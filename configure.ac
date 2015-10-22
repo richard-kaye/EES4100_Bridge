@@ -10,7 +10,6 @@ LT_INIT
 
 AC_PROG_CC
 AM_PROG_CC_C_O
-
 PKG_CHECK_MODULES([MODBUS], [libmodbus])
 PKG_CHECK_MODULES([BACNET], [libbacnet])
 
@@ -18,8 +17,8 @@ AC_SEARCH_LIBS([pthread_create], [pthread], [],
     AC_MSG_ERROR([*** POSIX threads support required]))
 
 AC_CONFIG_FILES([
-    Makefile
-    src/Makefile
+Makefile
+src/Makefile
 ])
 
 AC_OUTPUT
