@@ -39,10 +39,8 @@
  * BACnet client will print "Successful match" whenever it is able to receive
  * this set of data. Note that you will not have access to the RANDOM_DATA_POOL
  * for your final submitted application. */
-
-static uint16_t test_data[] = {
-    0xA4EC, 0x6E39, 0x8740, 0x1065, 0x9134, 0xFC8C
 };
+
 /*Linked List Object*/
 typedef struct s_list_object list_object;
 	struct s_list_object{
@@ -51,14 +49,12 @@ typedef struct s_list_object list_object;
 };
 #define NUM_LISTS 2
 static list_object *list_head[NUM_LISTS];
+uint16_t thread_display[3] = {};
 
 /*List is shared between Modbus and BACnet so need list lock*/
 static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t list_data_ready = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t list_data_flush = PTHREAD_COND_INITIALIZER;
-
-#define NUM_TEST_DATA (sizeof(test_data)/sizeof(test_data[0]))
-
 static pthread_mutex_t timer_lock = PTHREAD_MUTEX_INITIALIZER;
 
 
@@ -94,12 +90,10 @@ static list_object *list_get_first(list_object **list_head){
 
 
 
-static int Update_Analog_Input_Read_Property(BACNET_READ_PROPERTY_DATA *
-					     rpdata){
+static int Update_Analog_Input_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata){
 static int index;
 list_object *object;
-int instance_no =
-	bacnet_Analog_Input_Instance_To_Index(rpdata->object_instance);
+int instance_no = bacnet_Analog_Input_Instance_To_Index(rpdata->object_instance);
 
     if (rpdata->object_property != bacnet_PROP_PRESENT_VALUE){
 	goto not_pv;
@@ -110,6 +104,7 @@ int instance_no =
     }
 
     object = list_get_first(&list_head[instance_no]);
+    thread_display[instance_no] = object -> number;
     printf("AI_Present_Value request for instance %i\n", instance_no);
 
     /* Update the values to be sent to the BACnet client here.
@@ -120,13 +115,12 @@ int instance_no =
      *     First argument: Instance No
      *     Second argument: data to be sent
      *
-     * Without reconfiguring libbacnet, a maximum of 4 values may be sent */
-    bacnet_Analog_Input_Present_Value_Set(0, test_data[index++]);
-    /* bacnet_Analog_Input_Present_Value_Set(1, test_data[index++]); */
-    /* bacnet_Analog_Input_Present_Value_Set(2, test_data[index++]); */
+     * Without reconfiguring libbacnet, a maximum of 4 values may be sent 
+     * bacnet_Analog_Input_Present_Value_Set(0, test_data[index++]);
+     * bacnet_Analog_Input_Present_Value_Set(1, test_data[index++]); */
+     bacnet_Analog_Input_Present_Value_Set(instance_no, thread_display[instance_no]);
 
-    if (index == NUM_TEST_DATA)
-	index = 0;
+    
 
   not_pv:
     return bacnet_Analog_Input_Read_Property(rpdata);
