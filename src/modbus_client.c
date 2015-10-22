@@ -49,10 +49,10 @@ typedef struct s_list_object list_object;
 	uint16_t number;
 	list_object *next;
 };
+#define NUM_LISTS 2
+static list_object *list_head[NUM_LISTS];
 
 /*List is shared between Modbus and BACnet so need list lock*/
-#define NUM_LISTS 3
-static list_object *list_head[NUM_LISTS];
 static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t list_data_ready = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t list_data_flush = PTHREAD_COND_INITIALIZER;
@@ -97,13 +97,21 @@ static list_object *list_get_first(list_object **list_head){
 static int Update_Analog_Input_Read_Property(BACNET_READ_PROPERTY_DATA *
 					     rpdata){
 static int index;
+list_object *object;
 int instance_no =
 	bacnet_Analog_Input_Instance_To_Index(rpdata->object_instance);
 
-    if (rpdata->object_property != bacnet_PROP_PRESENT_VALUE)
+    if (rpdata->object_property != bacnet_PROP_PRESENT_VALUE){
 	goto not_pv;
+    }
 
+    if (list_head[instance_no]== NULL){
+    	goto not_pv;
+    }
+
+    object = list_get_first(&list_head[instance_no]);
     printf("AI_Present_Value request for instance %i\n", instance_no);
+
     /* Update the values to be sent to the BACnet client here.
      * The data should be read from the head of a linked list. You are required
      * to implement this list functionality.
@@ -291,7 +299,6 @@ static void *modbus_start(void *arg){ /*Allocate and initialise a new modbus_t
     	if (ctx == NULL) {	
 		fprintf(stderr, " Allocation and Initialisation unsucseful\n");                       
 		sleep(1);
-		return -1;
 		goto restart;
     	}
 /*Establish a connection using the modbus_t structure*/       
@@ -302,7 +309,6 @@ static void *modbus_start(void *arg){ /*Allocate and initialise a new modbus_t
 		modbus_free(ctx);/*This function shall free an allocated modbus_t structure*/
 		modbus_close(ctx);
 		sleep(1);
-		return -1;
 		goto restart;
     	}    
     	else {
@@ -315,7 +321,6 @@ static void *modbus_start(void *arg){ /*Allocate and initialise a new modbus_t
     	if (rc == -1) {
 		fprintf(stderr, "Reading of the registers has failed:%s\n",
 		                 		modbus_strerror(errno));
-		return -1;
 		modbus_free(ctx);
 		modbus_close(ctx);
 		goto restart;
