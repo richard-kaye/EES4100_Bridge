@@ -51,6 +51,7 @@ typedef struct s_list_object list_object;
 };
 
 /*List is shared between Modbus and BACnet so need list lock*/
+#define NUM_LISTS 3
 static list_object *list_head[NUM_LISTS];
 static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t list_data_ready = PTHREAD_COND_INITIALIZER;
@@ -59,9 +60,42 @@ static pthread_cond_t list_data_flush = PTHREAD_COND_INITIALIZER;
 #define NUM_TEST_DATA (sizeof(test_data)/sizeof(test_data[0]))
 
 static pthread_mutex_t timer_lock = PTHREAD_MUTEX_INITIALIZER;
+
+
+/////////////////////////////////////
+static void add_to_list(list_object **list_head, uint16_t number){
+        list_object *last_object, *temp_object;/**/
+	temp_object = malloc(sizeof(list_object));/*Allocate memory for each number*/
+        temp_object -> number = number;
+	temp_object -> next = NULL;
+
+	pthread_mutex_lock(&list_lock);
+
+	if (*list_head == NULL){/*make the first number in list*/
+		*list_head = temp_object;/*point to the first number*/
+	}
+	else{
+		last_object = *list_head;
+	while(last_object -> next){
+		last_object = last_object -> next;
+	}
+	last_object -> next = temp_object;
+	}
+																    	    pthread_mutex_unlock(&list_lock);													pthread_cond_signal(&list_data_ready);
+}
+
+static list_object *list_get_first(list_object **list_head){
+        list_object *first_object;
+	first_object = *list_head;
+        *list_head = (*list_head) -> next;
+	return first_object;
+}
+
+
+
+
 static int Update_Analog_Input_Read_Property(BACNET_READ_PROPERTY_DATA *
 					     rpdata){
-
 static int index;
 int instance_no =
 	bacnet_Analog_Input_Instance_To_Index(rpdata->object_instance);
@@ -209,38 +243,11 @@ static void *second_tick(void *arg)
  * Make Modbus a function
  * Make new thread for printing
 
-    *Add to list*/
-static void add_to_list(list_object **list_head, uint16_t number){
-	list_object *last_object, *temp_object;/**/
-	
-	temp_object = malloc(sizeof(list_object));/*Allocate memory for each number*/
+  */
 
-	temp_object -> number = number;
-	temp_object -> next = NULL;
 
-	pthread_mutex_lock(&list_lock);
 
-	if (*list_head == NULL){/*make the first number in list*/
-		*list_head = temp_object;/*point to the first number*/
-}
-	else{
-	last_object = *list_head;
-	while(last_object -> next){
-		last_object = last_object -> next;
-	}
-	last_object -> next = temp_object;
-	}
-	pthread_mutex_unlock(&list_lock);
-	pthread_cond_signal(&list_data_ready);
-}
-
-static list_object *list_get_first(list_object **list_head){
-	list_object *first_object;
-	first_object = *list_head;
-	*list_head = (*list_head) -> next;
-	return first_object;
-}
-
+/*
 static void *print_func(void *arg){
 	list_object  *current_object;
 	fprintf(stderr, "Print thread starting\n");
@@ -259,7 +266,9 @@ static void *print_func(void *arg){
 	}
 	return arg;
 }
-static list_flush(void){
+
+*/
+static void list_flush(void){
 	pthread_mutex_lock(&list_lock);
 	while(list_head != NULL){
 		pthread_cond_signal(&list_data_ready);
@@ -270,7 +279,7 @@ static list_flush(void){
 
 
 /*Modbus*/
-static modbus_start(void){ /*Allocate and initialise a new modbus_t
+static void *modbus_start(void *arg){ /*Allocate and initialise a new modbus_t
 							  structure*/
 	uint16_t tab_reg[64];
     	int rc;
@@ -291,6 +300,7 @@ static modbus_start(void){ /*Allocate and initialise a new modbus_t
 						modbus_strerror(errno));
 /*Detect return value from function to confirm connection*/
 		modbus_free(ctx);/*This function shall free an allocated modbus_t structure*/
+		modbus_close(ctx);
 		sleep(1);
 		return -1;
 		goto restart;
@@ -306,13 +316,17 @@ static modbus_start(void){ /*Allocate and initialise a new modbus_t
 		fprintf(stderr, "Reading of the registers has failed:%s\n",
 		                 		modbus_strerror(errno));
 		return -1;
+		modbus_free(ctx);
+		modbus_close(ctx);
 		goto restart;
     	}
-    //	for (i = 0; i < rc; i++) {
-/*Display the contents of registers up to the rc value, the number of registers read*/
-	//printf("reg[%d]=%d (0x%X)\n", i, tab_reg[i], tab_reg[i]);
+    	for (i = 0; i < rc; i++) {
+	/*have to replace the printf statement*/
+	/*printf("reg[%d]=%d (0x%X)\n", i, tab_reg[i], tab_reg[i]);*/
+	add_to_list(&list_head[i], tab_reg[i]);
+	printf("reg[%d]=%d (0x%X)\n", i, tab_reg[i], tab_reg[i]);
     
-    //	}
+        }
 /*Close the connection to the server and free the modbus_t structure*/
     	modbus_close(ctx);
     	modbus_free(ctx);
@@ -344,7 +358,7 @@ int main(int argc, char **argv)
     uint16_t pdu_len;
     BACNET_ADDRESS src;
     pthread_t minute_tick_id, second_tick_id;
-    pthread_t print_func_id;
+    pthread_t modbus_start_id;
     bacnet_Device_Set_Object_Instance_Number(BACNET_DEVICE_NO);
     bacnet_address_init();
 
@@ -366,8 +380,8 @@ int main(int argc, char **argv)
 
     pthread_create(&minute_tick_id, 0, minute_tick, NULL);
     pthread_create(&second_tick_id, 0, second_tick, NULL);
-    pthread_create(&print_func_id, 0, print_func, NULL);
-    modbus_start();
+    pthread_create(&modbus_start_id, 0, modbus_start, NULL);
+    //modbus_start();
     
     /* Start another thread here to retrieve your allocated registers from the
      * modbus server. This thread should have the following structure (in a

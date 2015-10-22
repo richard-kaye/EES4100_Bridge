@@ -11,8 +11,8 @@ BUILT_SOURCES = bacnet_namespace.h .bacnet_dependent_src_stamp
 EXTRA_DIST = bacnet_api_names
 
 .bacnet_dependent_src_stamp: bacnet_api_names $(BACNET_DEPENDENT_SRC)
-     cat $< | $(top_srcdir)/scripts/check_namespace.sh $< $?
-     touch $@
+	cat $< | $(top_srcdir)/scripts/check_namespace.sh $< $?
+	touch $@
 
 bacnet_namespace.h: bacnet_api_names
-     cat $< | $(top_srcdir)/scripts/build_namespace.sh > $@
+	cat $< | $(top_srcdir)/scripts/build_namespace.sh > $@
