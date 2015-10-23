@@ -9,7 +9,7 @@ The Modbus server is located with an IP address of 140.159.153.159 on port 502.
 The Bacnet client is located with an IP address of 140.159.160.7 on port 0xBAC0.
   The unique Bacnet Device ID numbers used to prevent conflict are 52 and 53
  
-The Bacnet client will continually send Who_Is requests to device 52 until it is found, when found the application will respond with an I_Am from device 52. Then the Bacnet client will send Read_Property requests for 2 instances at 100ms intervals.
+The Bacnet client will continually send Who_Is requests every second to device 52 until it is found, when found the application will respond with an I_Am from device 52. Then the Bacnet client will send Read_Property requests for 2 instances at 100ms intervals.
 
 The Autotools build system had been used for this application.
 To use the application clone the complete repository from Github using

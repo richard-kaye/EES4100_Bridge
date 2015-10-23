@@ -40,7 +40,6 @@ struct s_list_object {
 };
 #define NUM_LISTS 2
 static list_object *list_head[NUM_LISTS];
-uint16_t thread_display[3] = { };
 
 /*List is shared between Modbus and BACnet so need list lock*/
 static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -48,10 +47,9 @@ static pthread_cond_t list_data_ready = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t timer_lock = PTHREAD_MUTEX_INITIALIZER;
 
 /*Add object to linked list*/
-static void add_to_list(list_object ** list_head, uint16_t number)
-{
+static void add_to_list(list_object ** list_head, uint16_t number){
     list_object *last_object, *temp_object;
-    /**/ temp_object = malloc(sizeof(list_object)); /*Allocate memory for each object */
+    temp_object = malloc(sizeof(list_object)); /*Allocate memory for each object */
     temp_object->number = number;
     temp_object->next = NULL;
 
@@ -70,7 +68,7 @@ static void add_to_list(list_object ** list_head, uint16_t number)
     pthread_cond_signal(&list_data_ready);
 }
 
-static list_object *list_get_first(list_object ** list_head)
+static list_object *list_get_first(list_object **list_head)
 {
     list_object *first_object;
     first_object = *list_head;
@@ -87,20 +85,19 @@ static int Update_Analog_Input_Read_Property(BACNET_READ_PROPERTY_DATA *
 	bacnet_Analog_Input_Instance_To_Index(rpdata->object_instance);
 
     if (rpdata->object_property != bacnet_PROP_PRESENT_VALUE) {
-	pthread_mutex_lock(&list_lock);
 	goto not_pv;
     }
+    pthread_mutex_lock(&list_lock);
     if (list_head[instance_no] == NULL) {
-	pthread_mutex_unlock(&list_lock);
+        pthread_mutex_unlock(&list_lock);
 	goto not_pv;
     }
     object = list_get_first(&list_head[instance_no]);
+    pthread_mutex_unlock(&list_lock);
     printf("AI_Present_Value request for instance %i\n", instance_no);
-    thread_display[instance_no] = object->number;
-
+    printf("------------%i:%04X\n", instance_no, object->number);
+    bacnet_Analog_Input_Present_Value_Set(instance_no, object->number);
     free(object);
-    bacnet_Analog_Input_Present_Value_Set(instance_no,
-					  thread_display[instance_no]);
 
   not_pv:
     return bacnet_Analog_Input_Read_Property(rpdata);
@@ -224,11 +221,7 @@ static void *modbus_start(void *arg)
   restart:
 
     ctx = modbus_new_tcp(SERVER_ADDRESS, SERVER_PORT);	/*Arguments to function */
-    if (ctx == NULL) {
-	fprintf(stderr, " Allocation and Initialisation unsucseful\n");
-	sleep(1);
-	goto restart;
-    }
+    
 /*Establish a connection using the modbus_t structure*/
     if (modbus_connect(ctx) == -1) {
 	fprintf(stderr, "Connenction to server unsuccesful:%s\n",
@@ -242,7 +235,8 @@ static void *modbus_start(void *arg)
     }
 
 /*Read the registers*/
-    {
+	while(1);{
+    
 	rc = modbus_read_registers(ctx, 52, 2, tab_reg);/* I have been assigned Modbus address */
 	                                                              /*52 and 53 */
 	if (rc == -1) {
