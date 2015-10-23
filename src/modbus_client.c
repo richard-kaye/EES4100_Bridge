@@ -16,11 +16,9 @@
 #include <errno.h>
 #include <netinet/in.h>
 
-/*Define names for the arguments in the modbus_new_tcp() function*/
-#define SERVER_ADDRESS "127.0.0.1"
-/*Changed to the Loopback address for testing*/
+#define SERVER_ADDRESS              "127.0.0.1"	/*140.159.153.159 */
 #define SERVER_PORT                 502
-#define BACNET_DEVICE_NO          52
+#define BACNET_DEVICE_NO            52
 #define BACNET_PORT                 0xBAC1
 #define BACNET_INTERFACE            "lo"
 #define BACNET_DATALINK_TYPE        "bvlc"
@@ -30,86 +28,81 @@
 
 #if RUN_AS_BBMD_CLIENT
 #define BACNET_BBMD_PORT            0xBAC0
-#define BACNET_BBMD_ADDRESS         "127.0.0.1"
+#define BACNET_BBMD_ADDRESS         "127.0.0.1"	/*140.159.160.7 */
 #define BACNET_BBMD_TTL             90
 #endif
 
-/* If you are trying out the test suite from home, this data matches the data
- * stored in RANDOM_DATA_POOL for device number 12
- * BACnet client will print "Successful match" whenever it is able to receive
- * this set of data. Note that you will not have access to the RANDOM_DATA_POOL
- * for your final submitted application. */
-
-
 /*Linked List Object*/
 typedef struct s_list_object list_object;
-	struct s_list_object{
-	uint16_t number;
-	list_object *next;
+struct s_list_object {
+    uint16_t number;
+    list_object *next;
 };
 #define NUM_LISTS 2
 static list_object *list_head[NUM_LISTS];
-uint16_t thread_display[3] = {};
+uint16_t thread_display[3] = { };
 
 /*List is shared between Modbus and BACnet so need list lock*/
 static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t list_data_ready = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t timer_lock = PTHREAD_MUTEX_INITIALIZER;
 
+/*Add object to linked list*/
+static void add_to_list(list_object ** list_head, uint16_t number)
+{
+    list_object *last_object, *temp_object;
+    /**/ temp_object = malloc(sizeof(list_object)); /*Allocate memory for each object */
+    temp_object->number = number;
+    temp_object->next = NULL;
 
-/////////////////////////////////////
-static void add_to_list(list_object **list_head, uint16_t number){
-        list_object *last_object, *temp_object;/**/
-	temp_object = malloc(sizeof(list_object));/*Allocate memory for each number*/
-        temp_object -> number = number;
-	temp_object -> next = NULL;
+    pthread_mutex_lock(&list_lock);
 
+    if (*list_head == NULL) {	/*make the first number in list */
+	*list_head = temp_object;	/*point to the first number */
+    } else {
+	last_object = *list_head;
+	while (last_object->next) {
+	    last_object = last_object->next;
+	}
+	last_object->next = temp_object;
+    }
+    pthread_mutex_unlock(&list_lock);
+    pthread_cond_signal(&list_data_ready);
+}
+
+static list_object *list_get_first(list_object ** list_head)
+{
+    list_object *first_object;
+    first_object = *list_head;
+    *list_head = (*list_head)->next;
+    return first_object;
+}
+
+static int Update_Analog_Input_Read_Property(BACNET_READ_PROPERTY_DATA *
+					     rpdata)
+{
+
+    list_object *object;
+    int instance_no =
+	bacnet_Analog_Input_Instance_To_Index(rpdata->object_instance);
+
+    if (rpdata->object_property != bacnet_PROP_PRESENT_VALUE) {
 	pthread_mutex_lock(&list_lock);
-
-	if (*list_head == NULL){/*make the first number in list*/
-		*list_head = temp_object;/*point to the first number*/
-	}
-	else{
-		last_object = *list_head;
-	while(last_object -> next){
-		last_object = last_object -> next;
-	}
-	last_object -> next = temp_object;
-	}
-																    	    pthread_mutex_unlock(&list_lock);													pthread_cond_signal(&list_data_ready);
-}
-
-static list_object *list_get_first(list_object **list_head){
-        list_object *first_object;
-	first_object = *list_head;
-        *list_head = (*list_head) -> next;
-	return first_object;
-}
-
-
-
-
-static int Update_Analog_Input_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata){
-
-list_object *object;
-int instance_no = bacnet_Analog_Input_Instance_To_Index(rpdata->object_instance);
-
-    if (rpdata->object_property != bacnet_PROP_PRESENT_VALUE){
-    	pthread_mutex_lock(&list_lock);
 	goto not_pv;
     }
-    if (list_head[instance_no]== NULL){
-     	pthread_mutex_unlock(&list_lock);
-    	goto not_pv;
+    if (list_head[instance_no] == NULL) {
+	pthread_mutex_unlock(&list_lock);
+	goto not_pv;
     }
     object = list_get_first(&list_head[instance_no]);
     printf("AI_Present_Value request for instance %i\n", instance_no);
-    thread_display[instance_no] = object -> number;
+    thread_display[instance_no] = object->number;
 
     free(object);
-    bacnet_Analog_Input_Present_Value_Set(instance_no, thread_display[instance_no]);
+    bacnet_Analog_Input_Present_Value_Set(instance_no,
+					  thread_display[instance_no]);
 
-    not_pv:
+  not_pv:
     return bacnet_Analog_Input_Read_Property(rpdata);
 }
 
@@ -220,73 +213,57 @@ static void *second_tick(void *arg)
     return arg;
 }
 
-/* What I need to do
- * Create add to list (done)
- * Find the last object in the list
- * Place the next object in the list after the last object
- * Retrieve the first object from list
- * Print this object
- * Free object and memory
- * Flush the list
- * Set up Modbus connection
- * Make Modbus a function
- * Make new thread for printing
+/*Modbus thread*/
+static void *modbus_start(void *arg)
+{				/*Allocate and initialise a new modbus_t
+				   structure */
+    uint16_t tab_reg[64];
+    int rc;
+    int i;
+    modbus_t *ctx;
+  restart:
 
-  */
-
-
-/*Modbus*/
-static void *modbus_start(void *arg){ /*Allocate and initialise a new modbus_t
-							  structure*/
-	uint16_t tab_reg[64];
-    	int rc;
-    	int i;
-    	modbus_t *ctx;
-    	restart:
-
-    	ctx = modbus_new_tcp(SERVER_ADDRESS, SERVER_PORT);/*Arguments to function*/
-    	if (ctx == NULL) {	
-		fprintf(stderr, " Allocation and Initialisation unsucseful\n");                       
-		sleep(1);
-		goto restart;
-    	}
-/*Establish a connection using the modbus_t structure*/       
-    	if (modbus_connect(ctx) == -1) {
-		fprintf(stderr, "Connenction to server unsuccesful:%s\n",
-						modbus_strerror(errno));
-		modbus_free(ctx);/*This function shall free an allocated modbus_t structure*/
-		modbus_close(ctx);
-		sleep(1);
-		goto restart;
-    	}    
-    	else {
-		fprintf(stderr, "Connection to server succesful\n");
-    	} 
+    ctx = modbus_new_tcp(SERVER_ADDRESS, SERVER_PORT);	/*Arguments to function */
+    if (ctx == NULL) {
+	fprintf(stderr, " Allocation and Initialisation unsucseful\n");
+	sleep(1);
+	goto restart;
+    }
+/*Establish a connection using the modbus_t structure*/
+    if (modbus_connect(ctx) == -1) {
+	fprintf(stderr, "Connenction to server unsuccesful:%s\n",
+		modbus_strerror(errno));
+	modbus_free(ctx);	/*This function shall free an allocated modbus_t structure */
+	modbus_close(ctx);
+	sleep(1);
+	goto restart;
+    } else {
+	fprintf(stderr, "Connection to server succesful\n");
+    }
 
 /*Read the registers*/
-	{
-    	rc = modbus_read_registers(ctx, 52, 2, tab_reg);/* I have been assigned Modbus address*/
-                                                                 /*52 and 53*/
-    	if (rc == -1) {
-		fprintf(stderr, "Reading of the registers has failed:%s\n",
-		                 		modbus_strerror(errno));
-		modbus_free(ctx);
-		modbus_close(ctx);
-		goto restart;
-    	}
-    	for (i = 0; i < rc; i++) {
-	/*have to replace the printf statement*/
-	/*printf("reg[%d]=%d (0x%X)\n", i, tab_reg[i], tab_reg[i]);*/
-	add_to_list(&list_head[i], tab_reg[i]);
-	printf("reg[%d]=%d (0x%X)\n", i, tab_reg[i], tab_reg[i]);
-    
-        }
-      	sleep(0.1);//100ms sleep
-	return 0;
+    {
+	rc = modbus_read_registers(ctx, 52, 2, tab_reg);/* I have been assigned Modbus address */
+	                                                              /*52 and 53 */
+	if (rc == -1) {
+	    fprintf(stderr, "Reading of the registers has failed:%s\n",
+		    modbus_strerror(errno));
+	    modbus_free(ctx);
+	    modbus_close(ctx);
+	    goto restart;
 	}
-} /* End of Modbus*/
+	for (i = 0; i < rc; i++) {
+	    /*Add object to print */
+	    add_to_list(&list_head[i], tab_reg[i]);
+	    printf("reg[%d]=%d (0x%X)\n", i, tab_reg[i], tab_reg[i]);
 
+	}
+	sleep(0.1);	//100ms sleep
+	return 0;
+    }
+}
 
+/*End of Modbus thread*/
 
 static void ms_tick(void)
 {
@@ -304,7 +281,8 @@ static void ms_tick(void)
                     SERVICE_CONFIRMED_##service,        \
                     bacnet_handler_##handler)
 
-int main(int argc, char **argv){
+int main(int argc, char **argv)
+{
 
     uint8_t rx_buf[bacnet_MAX_MPDU];
     uint16_t pdu_len;
@@ -333,19 +311,6 @@ int main(int argc, char **argv){
     pthread_create(&minute_tick_id, 0, minute_tick, NULL);
     pthread_create(&second_tick_id, 0, second_tick, NULL);
     pthread_create(&modbus_start_id, 0, modbus_start, NULL);
-    //modbus_start();
-    
-    /* Start another thread here to retrieve your allocated registers from the
-     * modbus server. This thread should have the following structure (in a
-     * separate function):
-     *
-     * Initialise:
-     *      Connect to the modbus server
-     *
-     * Loop:
-     *      Read the required number of registers from the modbus server
-     *      Store the register data into the tail of a linked list 
-     */
 
     while (1) {
 	pdu_len =
