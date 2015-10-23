@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <netinet/in.h>
 
-#define SERVER_ADDRESS              "127.0.0.1"	/*140.159.153.159 */
+#define SERVER_ADDRESS              "140.159.153.159"
 #define SERVER_PORT                 502
 #define BACNET_DEVICE_NO            52
 #define BACNET_PORT                 0xBAC1
@@ -28,7 +28,7 @@
 
 #if RUN_AS_BBMD_CLIENT
 #define BACNET_BBMD_PORT            0xBAC0
-#define BACNET_BBMD_ADDRESS         "127.0.0.1"	/*140.159.160.7 */
+#define BACNET_BBMD_ADDRESS         "140.159.160.7"
 #define BACNET_BBMD_TTL             90
 #endif
 
@@ -235,7 +235,7 @@ static void *modbus_start(void *arg)
     }
 
 /*Read the registers*/
-	while(1);{
+	while(1) {
     
 	rc = modbus_read_registers(ctx, 52, 2, tab_reg);/* I have been assigned Modbus address */
 	                                                              /*52 and 53 */
@@ -252,9 +252,10 @@ static void *modbus_start(void *arg)
 	    printf("reg[%d]=%d (0x%X)\n", i, tab_reg[i], tab_reg[i]);
 
 	}
-	sleep(0.1);	//100ms sleep
-	return 0;
+	//sleep(0.1);	//100ms sleep
+	usleep(100000);
     }
+    return NULL;
 }
 
 /*End of Modbus thread*/
