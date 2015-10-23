@@ -5,6 +5,7 @@ This application is required as part of the assesment for my undergraduate studi
 The application has been written using GENTOO GNU/Linux distribution
 
 The application will simultaneously operate as a Modbus server and a Bacnet client.
+The application is a bridge between the Modbus server and Bacdnet client.
 The Modbus server is located with an IP address of 140.159.153.159 on port 502.
 The Bacnet client is located with an IP address of 140.159.160.7 on port 0xBAC0.
   The unique Bacnet Device ID numbers used to prevent conflict are 52 and 53
@@ -13,13 +14,17 @@ The Bacnet client will continually send Who_Is requests every second to device 5
 
 The Autotools build system had been used for this application.
 To use the application clone the complete repository from Github using
+
         git@github.com:richard-kaye/EES4100_Bridge.git
+
   then type
+
 	./bootstrap.sh
 	./configure
 	make
 
 To run the application go to the /src folder and type:
+
 	./modbus_client
 
 
