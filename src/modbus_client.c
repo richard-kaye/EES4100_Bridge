@@ -58,22 +58,22 @@ static void add_to_list(list_object ** list_head, uint16_t number){
     if (*list_head == NULL) {	/*make the first number in list */
 	*list_head = temp_object;	/*point to the first number */
     } else {
-	last_object = *list_head;
-	while (last_object->next) {
-	    last_object = last_object->next;
+	last_object = *list_head;/*Last pointer to head of list*/
+	while (last_object->next) { /*while the last object not NULL*/
+	    last_object = last_object->next;/*Move last object pointer to next object*/
 	}
-	last_object->next = temp_object;
+	last_object->next = temp_object;/*Set next pointer to temp_object*/
     }
     pthread_mutex_unlock(&list_lock);
     pthread_cond_signal(&list_data_ready);
 }
-
+/*Get lish head object*/
 static list_object *list_get_first(list_object **list_head)
 {
     list_object *first_object;
     first_object = *list_head;
     *list_head = (*list_head)->next;
-    return first_object;
+    return first_object;/*Return the list_head to list_get_first*/
 }
 
 static int Update_Analog_Input_Read_Property(BACNET_READ_PROPERTY_DATA *
