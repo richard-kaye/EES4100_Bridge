@@ -20,7 +20,7 @@
 #define SERVER_ADDRESS "127.0.0.1"
 /*Changed to the Loopback address for testing*/
 #define SERVER_PORT                 502
-#define BACNET_DEVICE_NO            52
+#define BACNET_DEVICE_NO          52
 #define BACNET_PORT                 0xBAC1
 #define BACNET_INTERFACE            "lo"
 #define BACNET_DATALINK_TYPE        "bvlc"
@@ -39,7 +39,7 @@
  * BACnet client will print "Successful match" whenever it is able to receive
  * this set of data. Note that you will not have access to the RANDOM_DATA_POOL
  * for your final submitted application. */
-};
+
 
 /*Linked List Object*/
 typedef struct s_list_object list_object;
@@ -54,7 +54,6 @@ uint16_t thread_display[3] = {};
 /*List is shared between Modbus and BACnet so need list lock*/
 static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t list_data_ready = PTHREAD_COND_INITIALIZER;
-static pthread_cond_t list_data_flush = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t timer_lock = PTHREAD_MUTEX_INITIALIZER;
 
 
@@ -91,38 +90,26 @@ static list_object *list_get_first(list_object **list_head){
 
 
 static int Update_Analog_Input_Read_Property(BACNET_READ_PROPERTY_DATA *rpdata){
-static int index;
+
 list_object *object;
 int instance_no = bacnet_Analog_Input_Instance_To_Index(rpdata->object_instance);
 
     if (rpdata->object_property != bacnet_PROP_PRESENT_VALUE){
+    	pthread_mutex_lock(&list_lock);
 	goto not_pv;
     }
-
     if (list_head[instance_no]== NULL){
+     	pthread_mutex_unlock(&list_lock);
     	goto not_pv;
     }
-
     object = list_get_first(&list_head[instance_no]);
-    thread_display[instance_no] = object -> number;
     printf("AI_Present_Value request for instance %i\n", instance_no);
+    thread_display[instance_no] = object -> number;
 
-    /* Update the values to be sent to the BACnet client here.
-     * The data should be read from the head of a linked list. You are required
-     * to implement this list functionality.
-     *
-     * bacnet_Analog_Input_Present_Value_Set() 
-     *     First argument: Instance No
-     *     Second argument: data to be sent
-     *
-     * Without reconfiguring libbacnet, a maximum of 4 values may be sent 
-     * bacnet_Analog_Input_Present_Value_Set(0, test_data[index++]);
-     * bacnet_Analog_Input_Present_Value_Set(1, test_data[index++]); */
-     bacnet_Analog_Input_Present_Value_Set(instance_no, thread_display[instance_no]);
+    free(object);
+    bacnet_Analog_Input_Present_Value_Set(instance_no, thread_display[instance_no]);
 
-    
-
-  not_pv:
+    not_pv:
     return bacnet_Analog_Input_Read_Property(rpdata);
 }
 
@@ -248,38 +235,6 @@ static void *second_tick(void *arg)
   */
 
 
-
-/*
-static void *print_func(void *arg){
-	list_object  *current_object;
-	fprintf(stderr, "Print thread starting\n");
-	while(1){
-		pthread_mutex_lock(&list_lock);
-		while(list_head == NULL){
-			pthread_cond_wait(&list_data_ready, &list_lock);
-		}
-	current_object = list_get_first;
-	pthread_mutex_unlock(&list_lock);
-	printf("Print thread: %d\n", current_object -> number);
-	free(current_object -> number);
-	free(current_object);
-
-	pthread_cond_signal(&list_data_flush);
-	}
-	return arg;
-}
-
-*/
-static void list_flush(void){
-	pthread_mutex_lock(&list_lock);
-	while(list_head != NULL){
-		pthread_cond_signal(&list_data_ready);
-		pthread_cond_wait(&list_data_flush, &list_lock);
-	}
-	pthread_mutex_unlock(&list_lock);
-}
-
-
 /*Modbus*/
 static void *modbus_start(void *arg){ /*Allocate and initialise a new modbus_t
 							  structure*/
@@ -299,7 +254,6 @@ static void *modbus_start(void *arg){ /*Allocate and initialise a new modbus_t
     	if (modbus_connect(ctx) == -1) {
 		fprintf(stderr, "Connenction to server unsuccesful:%s\n",
 						modbus_strerror(errno));
-/*Detect return value from function to confirm connection*/
 		modbus_free(ctx);/*This function shall free an allocated modbus_t structure*/
 		modbus_close(ctx);
 		sleep(1);
@@ -310,6 +264,7 @@ static void *modbus_start(void *arg){ /*Allocate and initialise a new modbus_t
     	} 
 
 /*Read the registers*/
+	{
     	rc = modbus_read_registers(ctx, 52, 2, tab_reg);/* I have been assigned Modbus address*/
                                                                  /*52 and 53*/
     	if (rc == -1) {
@@ -326,11 +281,9 @@ static void *modbus_start(void *arg){ /*Allocate and initialise a new modbus_t
 	printf("reg[%d]=%d (0x%X)\n", i, tab_reg[i], tab_reg[i]);
     
         }
-/*Close the connection to the server and free the modbus_t structure*/
-    	modbus_close(ctx);
-    	modbus_free(ctx);
-    	sleep(0.1);//100ms sleep
-    	return 0;
+      	sleep(0.1);//100ms sleep
+	return 0;
+	}
 } /* End of Modbus*/
 
 
@@ -351,8 +304,8 @@ static void ms_tick(void)
                     SERVICE_CONFIRMED_##service,        \
                     bacnet_handler_##handler)
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv){
+
     uint8_t rx_buf[bacnet_MAX_MPDU];
     uint16_t pdu_len;
     BACNET_ADDRESS src;
