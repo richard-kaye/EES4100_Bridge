@@ -23,8 +23,8 @@
 #define BACNET_INTERFACE            "lo"
 #define BACNET_DATALINK_TYPE        "bvlc"
 #define BACNET_SELECT_TIMEOUT_MS    1	/* ms */
-
 #define RUN_AS_BBMD_CLIENT          1
+#define NUMBER_OF_INSTANCES         2
 
 #if RUN_AS_BBMD_CLIENT
 #define BACNET_BBMD_PORT            0xBAC0
@@ -38,8 +38,8 @@ struct s_list_object {
     uint16_t number;
     list_object *next;
 };
-#define NUM_LISTS 2
-static list_object *list_head[NUM_LISTS];
+
+static list_object *list_head[NUMBER_OF_INSTANCES];
 
 /*List is shared between Modbus and BACnet so need list lock*/
 static pthread_mutex_t list_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -55,14 +55,14 @@ static void add_to_list(list_object ** list_head, uint16_t number){
 
     pthread_mutex_lock(&list_lock);
 
-    if (*list_head == NULL) {	/*make the first number in list */
-	*list_head = temp_object;	/*point to the first number */
+    if (*list_head == NULL) {	            /*make the first number in list */
+	*list_head = temp_object;	    /*point to the first number */
     } else {
-	last_object = *list_head;/*Last pointer to head of list*/
-	while (last_object->next) { /*while the last object not NULL*/
+	last_object = *list_head;           /*Last pointer to head of list*/
+	while (last_object->next) {         /*while the last object not NULL*/
 	    last_object = last_object->next;/*Move last object pointer to next object*/
 	}
-	last_object->next = temp_object;/*Set next pointer to temp_object*/
+	last_object->next = temp_object;    /*Set next pointer to temp_object*/
     }
     pthread_mutex_unlock(&list_lock);
     pthread_cond_signal(&list_data_ready);
@@ -73,7 +73,7 @@ static list_object *list_get_first(list_object **list_head)
     list_object *first_object;
     first_object = *list_head;
     *list_head = (*list_head)->next;
-    return first_object;/*Return the list_head to list_get_first*/
+    return first_object;                    /*Return the list_head to list_get_first*/
 }
 
 static int Update_Analog_Input_Read_Property(BACNET_READ_PROPERTY_DATA *
@@ -212,8 +212,7 @@ static void *second_tick(void *arg)
 
 /*Modbus thread*/
 static void *modbus_start(void *arg)
-{				/*Allocate and initialise a new modbus_t
-				   structure */
+{	/*Allocate and initialise a new modbus_t structure */
     uint16_t tab_reg[64];
     int rc;
     int i;
@@ -237,8 +236,8 @@ static void *modbus_start(void *arg)
 /*Read the registers*/
 	while(1) {
     
-	rc = modbus_read_registers(ctx, 52, 2, tab_reg);/* I have been assigned Modbus address */
-	                                                              /*52 and 53 */
+	rc = modbus_read_registers(ctx, BACNET_DEVICE_NO, NUMBER_OF_INSTANCES, tab_reg);
+	     /* I have been assigned Modbus address 52 and 53 */
 	if (rc == -1) {
 	    fprintf(stderr, "Reading of the registers has failed:%s\n",
 		    modbus_strerror(errno));
@@ -252,12 +251,10 @@ static void *modbus_start(void *arg)
 	    printf("reg[%d]=%d (0x%X)\n", i, tab_reg[i], tab_reg[i]);
 
 	}
-	//sleep(0.1);	//100ms sleep
-	usleep(100000);
+	usleep(100000);/*100ms sleep*/
     }
     return NULL;
 }
-
 /*End of Modbus thread*/
 
 static void ms_tick(void)

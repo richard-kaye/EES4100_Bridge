@@ -27,6 +27,8 @@ To run the application go to the /src folder and type:
 
 	./modbus_client
 
+This application can also be distributed as a tarball.
+
 
 
 	
